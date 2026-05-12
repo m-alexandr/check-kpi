@@ -1,0 +1,51 @@
+<div class="container py-4">
+  <div class="row justify-content-center">
+    <div class="col-12 col-lg-8">
+      <h1 class="h3 mb-2">Шаг 1. Загрузка датасета</h1>
+      <p class="text-secondary mb-4">
+        Загрузите большой CSV-файл и текстовое описание всех столбцов на русском языке (для контекста анализа и
+        последующих запросов к модели).
+      </p>
+
+      @if (parseError(); as err) {
+        <div class="alert alert-danger" role="alert">{{ err }}</div>
+      }
+
+      <form class="card shadow-sm" [formGroup]="form" (ngSubmit)="submit()">
+        <div class="card-body">
+          <div class="mb-3">
+            <label for="csvFile" class="form-label">CSV-датасет</label>
+            <input
+              id="csvFile"
+              class="form-control"
+              type="file"
+              accept=".csv,text/csv"
+              (change)="onFileChange($event)"
+            />
+            <div class="form-text">Читается только первая строка файла (заголовки столбцов); весь файл можно использовать позже в пайплайне.</div>
+          </div>
+
+          <div class="mb-3">
+            <label for="desc" class="form-label">Описание столбцов (на русском)</label>
+            <textarea
+              id="desc"
+              class="form-control"
+              rows="10"
+              formControlName="description"
+              placeholder="Например: ticket_id — уникальный номер заявки; created_at — дата создания; resolution_hours — среднее время решения задачи в часах; ..."
+            ></textarea>
+            @if (form.controls.description.touched && form.controls.description.errors?.['required']) {
+              <div class="invalid-feedback d-block">Укажите описание столбцов.</div>
+            }
+            @if (form.controls.description.touched && form.controls.description.errors?.['minlength']) {
+              <div class="invalid-feedback d-block">Минимум 20 символов, чтобы описание было содержательным.</div>
+            }
+          </div>
+        </div>
+        <div class="card-footer bg-transparent d-flex justify-content-end gap-2">
+          <button type="submit" class="btn btn-primary">Продолжить к выбору столбцов</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

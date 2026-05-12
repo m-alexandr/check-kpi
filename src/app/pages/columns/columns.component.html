@@ -1,0 +1,82 @@
+<div class="container py-4">
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+      <h1 class="h3 mb-0">Шаг 2. Столбцы для улучшения</h1>
+      <p class="text-secondary mb-0 small">Файл: {{ fileName() }}</p>
+    </div>
+    <button type="button" class="btn btn-outline-secondary btn-sm" (click)="restart()">Загрузить другой датасет</button>
+  </div>
+
+  <p class="text-secondary mb-4">
+    Отметьте один или несколько столбцов, по которым хотите получить идеи улучшения (например, «среднее время решения
+    задачи в часах»). Запрос к LM-серверу в этой версии заменён заглушкой; результат показывается в модальном окне.
+  </p>
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-header">Доступные столбцы</div>
+    <div class="card-body">
+      <div class="row row-cols-1 row-cols-md-2 g-2">
+        @for (col of columns(); track col) {
+          <div class="col">
+            <div class="form-check">
+              <input
+                class="form-check-input"
+                type="checkbox"
+                [id]="'col-' + $index"
+                [checked]="isSelected(col)"
+                (change)="onColumnChange(col, $event)"
+              />
+              <label class="form-check-label" [for]="'col-' + $index">{{ col }}</label>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+    <div class="card-footer bg-transparent d-flex flex-wrap align-items-center gap-2">
+      <button
+        type="button"
+        class="btn btn-primary"
+        [disabled]="selected().size === 0 || loading()"
+        (click)="requestAnalysis()"
+      >
+        @if (loading()) {
+          <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+        }
+        Запросить анализ (заглушка)
+      </button>
+      <span class="text-secondary small">Выбрано: {{ selected().size }}</span>
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-header">Фрагмент описания столбцов</div>
+    <div class="card-body">
+      <pre class="mb-0 small text-wrap text-break">{{ description() }}</pre>
+    </div>
+  </div>
+</div>
+
+<!-- Modal -->
+<div
+  #resultModal
+  class="modal fade"
+  id="analysisResultModal"
+  tabindex="-1"
+  aria-labelledby="analysisResultModalLabel"
+  aria-hidden="true"
+>
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title fs-5" id="analysisResultModalLabel">Результат анализа</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+      </div>
+      <div class="modal-body">
+        <pre class="result-pre mb-0">{{ resultMarkdown() }}</pre>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+      </div>
+    </div>
+  </div>
+</div>
