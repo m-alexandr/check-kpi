@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { Modal } from 'bootstrap';
 import { DatasetService } from '../../services/dataset.service';
 import { LmAnalysisService } from '../../services/lm-analysis.service';
+import { parseAnalysisInput, type ParsedAnalysis } from '../../utils/lm-analysis-result.parser';
 
 @Component({
   selector: 'app-columns',
@@ -19,7 +20,7 @@ export class ColumnsComponent implements OnDestroy {
 
   readonly selected = signal<Set<string>>(new Set());
   readonly loading = signal(false);
-  readonly resultMarkdown = signal('');
+  readonly analysisResult = signal<ParsedAnalysis | null>(null);
 
   private modal: Modal | null = null;
 
@@ -60,13 +61,13 @@ export class ColumnsComponent implements OnDestroy {
       })
       .subscribe({
         next: (text) => {
-          this.resultMarkdown.set(text);
+          this.analysisResult.set(parseAnalysisInput(text));
           this.loading.set(false);
           queueMicrotask(() => this.openModal());
         },
         error: () => {
           this.loading.set(false);
-          this.resultMarkdown.set('Произошла ошибка при получении ответа (заглушка не должна падать).');
+          this.analysisResult.set({ kind: 'fallback', text: 'Произошла ошибка при получении ответа.' });
           queueMicrotask(() => this.openModal());
         },
       });

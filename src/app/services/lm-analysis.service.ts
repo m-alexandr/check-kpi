@@ -39,18 +39,12 @@ export class LmAnalysisService {
         },
       ],
       temperature: 0.3,
-      max_tokens: 800,
+      max_tokens: 2048,
     };
 
     return this.http.post<ChatCompletionResponse>(this.chatUrl, body).pipe(
       tap((v) => console.log(v)),
-      map((res) => {
-        const text = res.choices?.[0]?.message?.content?.trim();
-        if (text) {
-          return text;
-        }
-        return JSON.stringify(res, null, 2);
-      }),
+      map((res) => JSON.stringify(res)),
       catchError((err: unknown) => {
         const httpErr = err as { error?: { error?: { message?: string } }; message?: string };
         const msg =
