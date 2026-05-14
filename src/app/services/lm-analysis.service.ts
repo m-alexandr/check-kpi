@@ -1,6 +1,16 @@
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { catchError, map, Observable, of, tap } from 'rxjs';
+import {
+  catchError,
+  map,
+  mergeMap,
+  Observable,
+  of,
+  retryWhen,
+  tap,
+  throwError,
+  timer,
+} from 'rxjs';
 
 export interface LmAnalysisPayload {
   selectedColumns: string[];
@@ -19,6 +29,47 @@ export interface LmDatasetOverviewPayload {
 /** Ответ OpenAI-совместимого POST /v1/chat/completions (LM Studio и т.п.) */
 interface ChatCompletionResponse {
   choices?: Array<{ message?: { content?: string } }>;
+}
+
+/** LM Studio иногда отдаёт 200 + JSON `{ "error": "Model reloaded." }` при перезагрузке модели. */
+function isTransientLmPayload(res: unknown): boolean {
+  if (!res || typeof res !== 'object') {
+    return false;
+  }
+  const o = res as Record<string, unknown>;
+  if (typeof o['error'] !== 'string') {
+    return false;
+  }
+  const t = o['error'].toLowerCase();
+  if (!t.includes('reload')) {
+    return false;
+  }
+  const choices = o['choices'];
+  if (Array.isArray(choices) && choices.length > 0) {
+    return false;
+  }
+  return true;
+}
+
+function errorText(err: unknown): string {
+  if (err instanceof HttpErrorResponse) {
+    const e = err.error;
+    if (e && typeof e === 'object' && typeof (e as { error?: unknown })['error'] === 'string') {
+      return (e as { error: string })['error'];
+    }
+    if (typeof e === 'string') {
+      return e;
+    }
+    return err.message ?? '';
+  }
+  if (err instanceof Error) {
+    return err.message;
+  }
+  return String(err);
+}
+
+function isTransientModelReload(err: unknown): boolean {
+  return errorText(err).toLowerCase().includes('model reloaded') || errorText(err).toLowerCase().includes('reloaded');
 }
 
 /**
@@ -65,8 +116,7 @@ export class LmAnalysisService {
           content: this.buildDatasetOverviewUserPrompt(payload),
         },
       ],
-      /** Меньше вывода — больше места под промпт при n_ctx 4096 в LM Studio */
-      { maxTokens: 4096 },
+      { maxTokens: 768*10 },
     );
   }
 
@@ -78,15 +128,32 @@ export class LmAnalysisService {
       model: 'deepseek-r1-distill-qwen-1.5b',
       messages,
       temperature: 0.25,
-      max_tokens: options?.maxTokens ?? 4096*2,
+      max_tokens: options?.maxTokens ?? 2048,
     };
-    return this.http.post<ChatCompletionResponse>(this.chatUrl, body).pipe(
-      tap((v) => console.log(v)),
-      map((res) => JSON.stringify(res)),
+
+    return this.http.post<unknown>(this.chatUrl, body).pipe(
+      map((res) => {
+        if (isTransientLmPayload(res)) {
+          throw new Error((res as { error: string })['error']);
+        }
+        return JSON.stringify(res as ChatCompletionResponse);
+      }),
+      retryWhen((errors) =>
+        errors.pipe(
+          mergeMap((err, index) => {
+            if (index >= 6) {
+              return throwError(() => err);
+            }
+            if (!isTransientModelReload(err)) {
+              return throwError(() => err);
+            }
+            return timer(900 + index * 450);
+          }),
+        ),
+      ),
+      tap((json) => console.log('LM response bytes', json.length)),
       catchError((err: unknown) => {
-        const httpErr = err as { error?: { error?: { message?: string } }; message?: string };
-        const msg =
-          httpErr?.error?.error?.message ?? httpErr?.message ?? 'Не удалось выполнить запрос к LM';
+        const msg = errorText(err) || 'Не удалось выполнить запрос к LM';
         return of(`Ошибка: ${msg}`);
       }),
     );
@@ -107,9 +174,9 @@ export class LmAnalysisService {
       desc = `${desc.slice(0, maxDescChars)}\n[…описание обрезано…]`;
     }
     let sample = p.sampleCsv;
-    // if (sample.length > maxSampleChars) {
-    //   sample = `${sample.slice(0, maxSampleChars)}\n[…CSV обрезан…]`;
-    // }
+    if (sample.length > maxSampleChars) {
+      sample = `${sample.slice(0, maxSampleChars)}\n[…CSV обрезан…]`;
+    }
     const body = [
       `Файл: ${p.fileName}`,
       '',
