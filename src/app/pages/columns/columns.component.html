@@ -8,9 +8,85 @@
   </div>
 
   <p class="text-secondary mb-4">
-    Отметьте один или несколько столбцов, по которым хотите получить идеи улучшения (например, «среднее время решения
-    задачи в часах»). Результат запроса к модели отображается в модальном окне.
+    После загрузки уже выполнен автоматический анализ качества данных и процессов (см. блок ниже). Далее отметьте
+    столбцы и запросите отдельные рекомендации по улучшению выбранных показателей — результат откроется в модальном
+    окне.
   </p>
+
+  <div class="card shadow-sm mb-4 border-primary">
+    <div class="card-header bg-primary text-white d-flex align-items-center justify-content-between gap-2">
+      <span class="fw-semibold">Автоанализ датасета</span>
+      @if (overviewLoading()) {
+        <span class="spinner-border spinner-border-sm text-light" role="status" aria-label="Загрузка"></span>
+      }
+    </div>
+    <div class="card-body">
+      @if (overviewError(); as oe) {
+        <div class="alert alert-danger mb-0" role="alert">{{ oe }}</div>
+      } @else if (overviewLoading()) {
+        <p class="text-secondary mb-0">
+          Выполняется запрос к модели… Когда ответ придёт, блок обновится сам (перезагружать страницу не нужно).
+        </p>
+      } @else if (overviewResult(); as ov) {
+        @if (ov.meta?.truncated) {
+          <div class="alert alert-warning small py-2 mb-3" role="status">
+            Ответ обрезан по лимиту токенов (<code>finish_reason: length</code>).
+          </div>
+        }
+        @if (ov.meta?.model; as model) {
+          <p class="small text-muted mb-2">Модель: <span class="text-body">{{ model }}</span></p>
+        }
+        @if (ov.meta; as om) {
+          @if (om.finishReason && !om.truncated) {
+            <p class="small text-muted mb-2">Завершение: <code>{{ om.finishReason }}</code></p>
+          }
+        }
+        @if (ov.meta?.reasoning; as reasoning) {
+          <details class="mb-3 border rounded p-2 bg-light">
+            <summary class="small text-secondary user-select-none">Цепочка рассуждений (reasoning)</summary>
+            <pre class="result-pre small mt-2 mb-0 text-wrap">{{ reasoning }}</pre>
+          </details>
+        }
+        @switch (ov.kind) {
+          @case ('structured') {
+            <section class="mb-3">
+              <h3 class="h6 text-secondary text-uppercase small mb-2">Кратко</h3>
+              <p class="lead fs-6 mb-0">{{ ov.summary }}</p>
+            </section>
+            @if (ov.risks.length) {
+              <section class="mb-3">
+                <h3 class="h6 text-secondary text-uppercase small mb-2">Проблемы / риски</h3>
+                <ul class="list-group list-group-flush border rounded overflow-hidden">
+                  @for (item of ov.risks; track $index) {
+                    <li class="list-group-item d-flex gap-2">
+                      <span class="text-danger flex-shrink-0" aria-hidden="true">•</span>
+                      <span>{{ item }}</span>
+                    </li>
+                  }
+                </ul>
+              </section>
+            }
+            @if (ov.recommendations.length) {
+              <section class="mb-0">
+                <h3 class="h6 text-secondary text-uppercase small mb-2">Решения / рекомендации</h3>
+                <ol class="list-group list-group-numbered">
+                  @for (item of ov.recommendations; track $index) {
+                    <li class="list-group-item">{{ item }}</li>
+                  }
+                </ol>
+              </section>
+            }
+          }
+          @case ('fallback') {
+            <p class="text-secondary small mb-2">Не удалось разобрать ответ как JSON.</p>
+            <pre class="result-pre mb-0 border rounded p-3 bg-light">{{ ov.text }}</pre>
+          }
+        }
+      } @else {
+        <p class="text-muted mb-0">Результат автоанализа пока недоступен.</p>
+      }
+    </div>
+  </div>
 
   <div class="card shadow-sm mb-4">
     <div class="card-header">Доступные столбцы</div>
@@ -36,10 +112,10 @@
       <button
         type="button"
         class="btn btn-primary"
-        [disabled]="selected().size === 0 || loading()"
+        [disabled]="selected().size === 0 || columnAnalysisLoading()"
         (click)="requestAnalysis()"
       >
-        @if (loading()) {
+        @if (columnAnalysisLoading()) {
           <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
         }
         Запросить анализ

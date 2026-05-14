@@ -19,7 +19,7 @@ export class ColumnsComponent implements OnDestroy {
   readonly modalRoot = viewChild.required<ElementRef<HTMLElement>>('resultModal');
 
   readonly selected = signal<Set<string>>(new Set());
-  readonly loading = signal(false);
+  readonly columnAnalysisLoading = signal(false);
   readonly analysisResult = signal<ParsedAnalysis | null>(null);
 
   private modal: Modal | null = null;
@@ -27,6 +27,10 @@ export class ColumnsComponent implements OnDestroy {
   readonly fileName = this.dataset.fileName;
   readonly columns = this.dataset.columns;
   readonly description = this.dataset.columnDescription;
+
+  readonly overviewLoading = this.dataset.overviewLoading;
+  readonly overviewError = this.dataset.overviewError;
+  readonly overviewResult = this.dataset.overviewResult;
 
   toggleColumn(name: string, checked: boolean): void {
     const next = new Set(this.selected());
@@ -52,7 +56,7 @@ export class ColumnsComponent implements OnDestroy {
     if (cols.length === 0) {
       return;
     }
-    this.loading.set(true);
+    this.columnAnalysisLoading.set(true);
     this.lm
       .analyze({
         selectedColumns: cols,
@@ -62,11 +66,11 @@ export class ColumnsComponent implements OnDestroy {
       .subscribe({
         next: (text) => {
           this.analysisResult.set(parseAnalysisInput(text));
-          this.loading.set(false);
+          this.columnAnalysisLoading.set(false);
           queueMicrotask(() => this.openModal());
         },
         error: () => {
-          this.loading.set(false);
+          this.columnAnalysisLoading.set(false);
           this.analysisResult.set({ kind: 'fallback', text: 'Произошла ошибка при получении ответа.' });
           queueMicrotask(() => this.openModal());
         },
